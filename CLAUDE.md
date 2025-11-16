@@ -4,11 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-`gh-star` is a GitHub CLI extension for working with personal GitHub Stars and Star Lists from the terminal. The project is currently in early fork/setup phase.
+`gh-star` is a GitHub CLI extension for working with personal GitHub Stars and Star Lists from the terminal. The project is currently in early setup phase.
 
 **Language**: Go
 **Project Type**: GitHub CLI Extension
-**Status**: 🚧 Fork in progress, expect some dust 🚧
+**Status**: Initial setup
 
 ## Development Commands
 
@@ -67,7 +67,6 @@ gh-star/
 ### Prerequisites
 1. Go installed (version TBD based on go.mod when created)
 2. GitHub CLI (`gh`) installed and authenticated
-3. Git configured for the fork
 
 ### Testing Changes
 After making changes, rebuild and test:

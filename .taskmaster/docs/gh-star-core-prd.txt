@@ -1,0 +1,226 @@
+# Product Requirements Document: gh-star Core Implementation
+
+## Overview
+
+Build gh-star, a GitHub CLI extension for managing large collections (1000-3000+) of starred repositories. The tool provides local-first star management with powerful search, organization, batch operations, and backup capabilities that GitHub's web interface lacks.
+
+## Target Users
+
+Developers with 1500+ starred repositories who treat stars as a curated knowledge base requiring robust organization and search capabilities.
+
+## Core Value Proposition
+
+- **Local-first storage** with SQLite for fast, offline access and complex queries
+- **One-way sync** with GitHub Stars and Star Lists using namespaced tags
+- **Full-text search** across repository metadata and user notes
+- **Flexible tagging** beyond GitHub's list feature
+- **Pipeline-friendly CLI** that integrates with Unix tools and workflows
+- **Version-controllable backups** via YAML/JSON export
+
+## Technical Architecture
+
+### Storage Layer
+- **SQLite database** (pure-Go driver `modernc.org/sqlite`, no CGo)
+- **Location**: `~/.config/gh-star/stars.db`
+- **Schema**: Relational model with FTS5 full-text search
+- **Tables**: repositories, tags, repository_tags, repository_metadata
+- **Performance**: Indexed queries for 3000+ repos
+
+### GitHub Integration
+- **Authentication**: Use `gh` CLI (github.com/cli/go-gh)
+- **Sync Strategy**: One-way read from GitHub with namespaced tags
+- **GitHub Lists**: Imported as `gh:*` prefixed tags (e.g., "CLI Tools" → `gh:cli-tools`)
+- **Tag Reconciliation**: On sync, delete all `gh:*` tags and re-apply from GitHub
+- **User Tags**: Remain untouched during sync, fully local
+
+### CLI Framework
+- **Library**: cobra for command structure
+- **Extension**: Installed via `gh extension install`
+- **Output Modes**: Simple text (default), JSON, TSV for piping
+- **Interactive Mode**: Optional fzf integration via `--interactive` flag
+
+### Export/Import System
+- **Formats**: YAML (human-readable) and JSON (machine-readable)
+- **Structure**: One file per repository for clean git diffs
+- **Directory Layout**: `<path>/stars/owner/repo.yaml`
+- **Use Case**: Version control, backup, sharing collections
+
+## Feature Requirements
+
+### Phase 1: Initialization and Sync
+
+**F1.1: Initial Setup (`gh star init`)**
+- Create config directory and database
+- Fetch all starred repositories from GitHub API (paginated)
+- Fetch all Star Lists and memberships
+- Import repos and create `gh:*` tags from lists
+- Show progress bar for large collections
+- Flags: `--skip-lists`, `--force`
+
+**F1.2: Incremental Sync (`gh star sync`)**
+- Fetch new stars since last sync
+- Update existing repository metadata
+- Reconcile `gh:*` tags (delete all `is_github_list=true` tags, re-fetch and re-apply)
+- Preserve user tags and metadata
+- Show summary of changes
+- Flags: `--full`, `--skip-lists`
+
+### Phase 2: Search and Discovery
+
+**F2.1: List Repositories (`gh star list`)**
+- List all repositories with filtering
+- Filters: `--tag` (repeatable), `--language`, `--since`, `--until`, `--archived`, `--limit`
+- Sorting: `--sort` (starred, name, stars, updated)
+- Output formats: simple (default), TSV, JSON
+- Default output: One `owner/repo` per line
+
+**F2.2: Full-Text Search (`gh star search <query>`)**
+- FTS5 search across: full_name, description, topics, notes
+- Support FTS5 query syntax (phrases, boolean operators)
+- Combine with all filter flags from `list`
+- Flag: `--interactive` for fzf mode
+- Return results sorted by relevance
+
+**F2.3: Show Repository Details (`gh star show <repo>`)**
+- Display detailed info: metadata, tags (separated: `gh:*` vs user), notes
+- Accept `owner/repo` format or GitHub URL
+- Flag: `--json` for structured output
+- Human-readable format with sections
+
+### Phase 3: Organization
+
+**F3.1: Tag Management**
+- `gh star tag add <repo> <tags...>` - Add one or more tags
+- `gh star tag remove <repo> <tags...>` - Remove tags
+- `gh star tags` - List all tags with counts
+- Validate: Reject `gh:` prefix (reserved for GitHub lists)
+- Flags for `tags`: `--user-only`, `--github-only`, `--sort`
+
+**F3.2: Notes Management**
+- `gh star note set <repo> <text>` - Set notes (supports stdin with `-`)
+- `gh star note show <repo>` - Display notes
+- Multi-line notes support
+- Update FTS5 index when notes change
+
+### Phase 4: Batch Operations
+
+**F4.1: Bulk Tagging (`gh star bulk-tag`)**
+- Add tags to multiple repos matching filters
+- Use all filter flags from `list` command
+- Flag: `--tags` (comma-separated tags to add)
+- Show confirmation prompt with count before applying
+- Flag: `--yes` to skip confirmation
+- Execute in transaction for atomicity
+
+**F4.2: Bulk Unstar (`gh star bulk-unstar`)**
+- Unstar repos matching filters (destructive)
+- Show list of repos with confirmation prompt
+- Call GitHub API to unstar each repo
+- Remove from local database after successful unstar
+- Handle API failures gracefully (continue on error)
+- Show summary of successes/failures
+
+### Phase 5: Export and Import
+
+**F5.1: Export Collection (`gh star export <path>`)**
+- Export to directory with one file per repo
+- Directory structure: `<path>/stars/owner/repo.yaml` (or .json)
+- Include metadata file with export info
+- Flags: `--format` (yaml or json), all filter flags from `list`
+- Show progress bar for large exports
+
+**F5.2: Import Collection (`gh star import <path>`)**
+- Import from exported directory
+- Auto-detect format (YAML or JSON)
+- Two modes:
+  - **Replace** (default): Clear database and import (with confirmation)
+  - **Merge** (`--merge`): Merge with existing data by repo ID
+- Flag: `--yes` to skip confirmation
+- Show progress bar and summary
+
+### Phase 6: Interactive Mode
+
+**F6.1: fzf Integration**
+- Detect if fzf is installed, fallback gracefully if not
+- Launch fzf with repository list for `--interactive` flag
+- Features:
+  - Fuzzy search across repo names
+  - Preview pane showing repo details (`gh star show {}`)
+  - Multi-select support (TAB)
+  - Output selected repos to stdout for piping
+- Apply to `search` and `list` commands
+
+## Database Schema
+
+### Table: repositories
+- Stores GitHub repository metadata
+- Fields: id (GitHub ID), full_name, owner, name, description, url, homepage, language, stars_count, forks_count, topics (JSON), archived, starred_at, created_at, updated_at, synced_at
+- Indexes: language, starred_at, full_name
+
+### Table: tags
+- User-defined tags (both `gh:*` and custom)
+- Fields: id, name (unique), is_github_list (boolean), created_at
+
+### Table: repository_tags
+- Many-to-many relationship
+- Fields: repository_id, tag_id, created_at
+- Foreign keys with CASCADE delete
+
+### Table: repository_metadata
+- User-added metadata
+- Fields: repository_id, notes (text), custom_fields (JSON), last_modified
+
+### FTS5 Virtual Table
+- Full-text search index
+- Fields: full_name, description, topics, notes
+- Synchronized with repositories and repository_metadata tables
+
+## Technical Constraints
+
+1. **Pure Go**: Use `modernc.org/sqlite` (no CGo) for cross-platform builds
+2. **XDG Compliance**: Config at `~/.config/gh-star/` (with platform-specific fallbacks)
+3. **GitHub API**: Rate limit handling with exponential backoff
+4. **Performance**: Handle 3000+ repos efficiently with proper indexing
+5. **Atomicity**: Use transactions for batch operations
+6. **Error Handling**: Clear, actionable error messages with proper exit codes
+
+## Success Criteria
+
+1. Successfully manage 3000+ starred repositories with sub-second query times
+2. Pipeline-friendly output that works with grep, jq, xargs, fzf
+3. Reliable sync with GitHub maintaining both GitHub lists and user tags
+4. Version-controllable exports with clean git diffs (one file per repo)
+5. Cross-platform support (Linux, macOS, Windows) via single binary
+6. Zero-config setup for gh CLI users (inherits authentication)
+7. Comprehensive test coverage with unit and integration tests
+
+## Out of Scope (Future Enhancements)
+
+- Analytics and insights (trending, activity tracking, statistics)
+- Rich TUI interface (like lazygit)
+- Two-way sync (write-back to GitHub Lists)
+- Advanced search (regex, dependency graphs, recommendations)
+- Collaboration features (shared collections, team management)
+
+## Implementation Phases
+
+Refer to `docs/wip/gh-star-core/implementation.md` for detailed phase breakdown:
+
+1. **Phase 1**: Project setup and foundation (Go module, CLI framework, config)
+2. **Phase 2**: Database layer (schema, migrations, CRUD operations)
+3. **Phase 3**: GitHub API integration (client, stars, lists)
+4. **Phase 4**: Core commands part 1 (init, sync)
+5. **Phase 5**: Core commands part 2 (list, search, show)
+6. **Phase 6**: Core commands part 3 (tag, note)
+7. **Phase 7**: Batch operations (bulk-tag, bulk-unstar)
+8. **Phase 8**: Export/import functionality
+9. **Phase 9**: Interactive mode (fzf integration)
+10. **Phase 10**: Polish and documentation
+11. **Phase 11**: Build and release
+
+## Design Documentation
+
+- **Design Document**: `docs/wip/gh-star-core/design.md` (comprehensive design specifications)
+- **Implementation Plan**: `docs/wip/gh-star-core/implementation.md` (task-by-task implementation guide)
+
+These documents provide complete technical specifications for implementation.

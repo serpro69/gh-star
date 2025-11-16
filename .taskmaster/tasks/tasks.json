@@ -1,0 +1,447 @@
+{
+  "master": {
+    "tasks": [
+      {
+        "id": 1,
+        "title": "Project Setup and CLI Framework",
+        "description": "Initialize Go module, set up Cobra CLI framework, and establish GitHub CLI extension structure",
+        "status": "pending",
+        "dependencies": [],
+        "priority": "high",
+        "details": "Following the comprehensive design specification in docs/wip/gh-star-core/design.md and implementation plan in docs/wip/gh-star-core/implementation.md (Phase 1), initialize Go module with 'go mod init github.com/serpro69/gh-star' and Go version 1.21+. Add core dependencies: github.com/spf13/cobra@v1.8.1 for CLI framework, github.com/cli/go-gh@v2.11.0 for GitHub CLI integration, and github.com/adrg/xdg@v0.5.0 for XDG-compliant configuration paths. Create project directory structure as defined in implementation.md with main.go as CLI entry point, cmd/ directory for command implementations, and internal/ for packages. Set up cmd/root.go with base 'gh star' command, version command, and help system. Implement internal/config package with GetConfigDir() and GetDatabasePath() functions using XDG Base Directory specification (~/.config/gh-star/) with cross-platform support (Windows: %APPDATA%/gh-star/, macOS: ~/Library/Application Support/gh-star/). Create .gitignore for Go projects and Makefile with build, install, and test targets. Ensure binary is executable and integrates properly with 'gh extension install .' command. Reference complete technical specifications in .taskmaster/docs/gh-star-core-prd.txt for architectural requirements.",
+        "testStrategy": "Unit tests for config path resolution across platforms (Linux, macOS, Windows) with XDG environment variable overrides. Integration test to verify 'gh star --version' works after installation using 'gh extension install .' Test that help command displays all available subcommands and follows GitHub CLI extension conventions. Test build process with 'go build -o gh-star' and cross-platform compilation. Verify Makefile targets (build, test, install, clean) function correctly. Test config directory creation with EnsureConfigDir() function.",
+        "subtasks": null
+      },
+      {
+        "id": 2,
+        "title": "Database Layer Implementation",
+        "description": "Set up SQLite database with schema, migrations, and repository for data access",
+        "status": "pending",
+        "dependencies": [
+          1
+        ],
+        "priority": "high",
+        "details": "Add modernc.org/sqlite@v1.33.1 as pure-Go SQLite driver. Create internal/database package with db.go for connection management. Design schema in internal/database/schema.sql with tables: repositories (id, full_name, owner, name, description, url, homepage, language, stars_count, forks_count, topics JSON, archived, starred_at, created_at, updated_at, synced_at), tags (id, name UNIQUE, is_github_list BOOLEAN, created_at), repository_tags (repository_id, tag_id, created_at with CASCADE FKs), repository_metadata (repository_id, notes TEXT, custom_fields JSON, last_modified). Create FTS5 virtual table for full-text search: CREATE VIRTUAL TABLE repo_search USING fts5(full_name, description, topics, notes, content=repositories, content_rowid=id). Implement migration system in internal/database/migrations.go using embedded SQL files with go:embed. Create indexes on repositories.language, repositories.starred_at, repositories.full_name. Add connection pool management with configurable limits.\n\nREFERENCE DOCUMENTATION:\n- Database Schema: docs/wip/gh-star-core/design.md (Data Model section) - Contains detailed table definitions, indexes, and FTS5 configuration\n- Implementation Plan: docs/wip/gh-star-core/implementation.md (Phase 2) - Provides step-by-step database implementation tasks\n- PRD: .taskmaster/docs/gh-star-core-prd.txt (Technical Architecture section) - Outlines SQLite requirements and performance targets\n\nThese documents specify exact column types, foreign key relationships, index specifications, SQLite pragmas (journal_mode=WAL, foreign_keys=ON), and migration strategies. Follow the documented schema exactly as defined.",
+        "testStrategy": "Test database initialization creates all tables correctly. Verify migration system handles version upgrades. Test CRUD operations for each table. Benchmark query performance with 3000+ sample repositories. Test FTS5 search functionality with various query patterns. Verify foreign key constraints and CASCADE deletes work correctly.",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Set up SQLite driver and database connection package",
+            "description": "Install modernc.org/sqlite pure-Go driver and create the internal/database package with connection management and configuration for the SQLite database",
+            "dependencies": [],
+            "details": "Add modernc.org/sqlite@v1.33.1 dependency to go.mod. Create internal/database/db.go with connection pool management supporting configurable limits. Implement NewDB() function that opens SQLite connection with proper pragmas (foreign_keys=ON, journal_mode=WAL). Add configuration struct for max connections, timeout settings, and database file path. Include connection validation and graceful shutdown methods. Reference docs/wip/gh-star-core/design.md for exact SQLite pragma requirements and docs/wip/gh-star-core/implementation.md Phase 2 Task 2.1 for database configuration details.",
+            "status": "pending",
+            "testStrategy": "Test database connection opens successfully, verify connection pool limits are enforced, test graceful shutdown closes all connections, verify WAL mode is enabled"
+          },
+          {
+            "id": 2,
+            "title": "Create database schema and initial SQL structure",
+            "description": "Design and implement the complete database schema with all required tables including repositories, tags, repository_tags, repository_metadata, and the FTS5 search table",
+            "dependencies": [
+              1
+            ],
+            "details": "Create internal/database/schema.sql containing all CREATE TABLE statements as defined in docs/wip/gh-star-core/design.md Data Model section. Define repositories table with columns: id INTEGER PRIMARY KEY, full_name TEXT NOT NULL UNIQUE, owner TEXT NOT NULL, name TEXT NOT NULL, description TEXT, url TEXT, homepage TEXT, language TEXT, stars_count INTEGER, forks_count INTEGER, topics JSON, archived BOOLEAN, starred_at TIMESTAMP, created_at TIMESTAMP, updated_at TIMESTAMP, synced_at TIMESTAMP. Define tags table with id, name (UNIQUE), is_github_list BOOLEAN, created_at. Create repository_tags junction table with CASCADE foreign keys. Add repository_metadata table with notes and custom_fields JSON. Create FTS5 virtual table repo_search for full-text searching with tokenizer: unicode61. Add indexes on repositories.language, repositories.starred_at, and repositories.full_name as specified in design documentation.",
+            "status": "pending",
+            "testStrategy": "Verify all tables are created with correct columns and types, test foreign key constraints work correctly, verify indexes are created, test FTS5 table creation and tokenization"
+          },
+          {
+            "id": 3,
+            "title": "Implement database migration system",
+            "description": "Build a robust migration system using embedded SQL files with version tracking and rollback capabilities for schema changes",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Create internal/database/migrations.go with migration runner using go:embed directive as outlined in docs/wip/gh-star-core/implementation.md Phase 2 Task 2.1. Create migrations/ directory with numbered SQL files (001_initial_schema.sql containing the schema from subtask 2). Implement migrations table to track applied versions. Add MigrateUp() and MigrateDown() functions with transaction support. Include version checking to prevent duplicate migrations. Support both up and down migrations for rollback capability. Embed migration files at compile time using //go:embed migrations/*.sql directive. Follow the schema version tracking approach defined in the implementation plan.",
+            "status": "pending",
+            "testStrategy": "Test migration applies initial schema correctly, verify version tracking prevents duplicate runs, test rollback functionality, verify migrations run in correct order, test error handling rolls back partial migrations"
+          },
+          {
+            "id": 4,
+            "title": "Create repository for database operations",
+            "description": "Implement the repository pattern with methods for CRUD operations on all database tables with proper transaction support",
+            "dependencies": [
+              1,
+              2,
+              3
+            ],
+            "details": "Create internal/database/repository.go with DBRepository struct containing database connection as specified in docs/wip/gh-star-core/implementation.md Phase 2 Task 2.2. Implement basic CRUD methods: CreateRepository, UpdateRepository, DeleteRepository, GetRepositoryByID, GetRepositoryByFullName. Add tag operations: CreateTag, DeleteTag, GetTagByName, ListTags, AddTagToRepository, RemoveTagFromRepository. Implement metadata operations: UpdateRepositoryMetadata, GetRepositoryMetadata. Add transaction support with Begin(), Commit(), and Rollback() methods. Include prepared statement caching for frequently used queries. Implement RepositoryFilter struct with fields for Language, Tags, Since, Until, Archived, Limit, Sort as defined in the implementation plan.",
+            "status": "pending",
+            "testStrategy": "Unit test all CRUD operations with mock data, verify transaction atomicity, test prepared statement caching improves performance, test concurrent access patterns, verify foreign key constraints are enforced"
+          },
+          {
+            "id": 5,
+            "title": "Implement FTS5 search and query optimization",
+            "description": "Set up full-text search functionality using FTS5 and optimize database queries with proper indexing and query planning",
+            "dependencies": [
+              1,
+              2,
+              3,
+              4
+            ],
+            "details": "Implement SearchRepositories method in repository.go using FTS5 MATCH queries as specified in docs/wip/gh-star-core/design.md. Create triggers to keep FTS5 table in sync with repositories table on INSERT, UPDATE, DELETE. Add search ranking using FTS5's bm25() function. Implement query builder for complex searches combining FTS5 with regular filters. Add EXPLAIN QUERY PLAN testing for all major queries to ensure index usage. Create benchmark tests with 3000+ sample repositories to verify query performance meets requirements in PRD. Implement query result caching for frequently accessed data. Follow FTS5 configuration with unicode61 tokenizer as documented in design specifications.",
+            "status": "pending",
+            "testStrategy": "Test FTS5 search with various query patterns including phrases and boolean operators, verify triggers keep search index in sync, benchmark search performance with large datasets, test search ranking produces relevant results"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Repository and Tag Models with Data Access Layer",
+        "description": "Create domain models and repository pattern for database operations following the comprehensive design specification in docs/wip/gh-star-core/design.md and implementation plan in docs/wip/gh-star-core/implementation.md (Phase 2, Tasks 2.2-2.5). Reference the detailed PRD at .taskmaster/docs/gh-star-core-prd.txt for additional context.",
+        "status": "pending",
+        "dependencies": [
+          2
+        ],
+        "priority": "high",
+        "details": "Create internal/models package with repository.go defining Repository struct matching database schema (as per design.md Data Model section). Add Tag struct with validation to prevent 'gh:' prefix for user tags. Implement internal/repository package with repository_store.go providing methods: Create, Update, Delete, FindByID, FindByFullName, List with filters (ListOptions struct with Language, Since, Until, Archived, Tags, Limit, Offset, SortBy fields). Implement tag_store.go with CreateTag, DeleteTag, FindTagByName, ListTags, AddTagToRepository, RemoveTagFromRepository. Add metadata_store.go for notes management. Implement search_store.go with FTS5 search using MATCH queries, supporting phrases and boolean operators. Use prepared statements for all queries. Add transaction support with Begin/Commit/Rollback. Implement connection pooling and query timeout handling. Create pagination helpers returning (results, total, error). All implementation details are fully specified in the design documentation and implementation plan (Phase 2: Database Layer).",
+        "testStrategy": "Unit tests for all repository methods with mock data. Test filter combinations and sorting options. Verify pagination works correctly. Test tag validation rejects 'gh:' prefix. Test FTS5 search with complex queries. Benchmark bulk operations with transactions. Test concurrent access with multiple goroutines.",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create domain models package with Repository and Tag structs",
+            "description": "Set up the internal/models package with Repository and Tag domain models that match the database schema and include validation logic",
+            "dependencies": [],
+            "details": "Create internal/models/repository.go with Repository struct containing ID, FullName, Owner, Name, Description, Language, StarredAt, LastSync, Archived, Private, and Topics fields. Create internal/models/tag.go with Tag struct containing ID, Name, IsSystem, CreatedAt fields. Add validation method to Tag struct that returns error if name starts with 'gh:' prefix. Include JSON tags for API serialization and db tags for database mapping.",
+            "status": "pending",
+            "testStrategy": "Unit tests for Tag validation to ensure 'gh:' prefix is rejected. Test Repository struct marshaling/unmarshaling. Verify all fields are properly tagged for database operations."
+          },
+          {
+            "id": 2,
+            "title": "Implement repository store with CRUD operations",
+            "description": "Create repository_store.go in internal/repository package implementing basic CRUD operations and list filtering for repositories",
+            "dependencies": [
+              1
+            ],
+            "details": "Create internal/repository/repository_store.go with RepositoryStore struct containing db connection. Implement Create(repo *models.Repository) error, Update(repo *models.Repository) error, Delete(id int64) error, FindByID(id int64) (*models.Repository, error), FindByFullName(fullName string) (*models.Repository, error). Add ListOptions struct with Language, Since, Until, Archived, Tags, Limit, Offset, SortBy fields. Implement List(opts ListOptions) ([]*models.Repository, int, error) with dynamic query building based on filters. Use prepared statements for all queries and implement proper error handling.",
+            "status": "pending",
+            "testStrategy": "Unit tests with mock database for all CRUD operations. Test various filter combinations in List method. Verify prepared statements are used. Test pagination with limit/offset. Test error scenarios like not found, constraint violations."
+          },
+          {
+            "id": 3,
+            "title": "Implement tag store with repository associations",
+            "description": "Create tag_store.go implementing tag management operations including repository-tag associations",
+            "dependencies": [
+              1
+            ],
+            "details": "Create internal/repository/tag_store.go with TagStore struct. Implement CreateTag(tag *models.Tag) error with validation, DeleteTag(id int64) error, FindTagByName(name string) (*models.Tag, error), ListTags(userOnly, systemOnly bool, sortBy string) ([]*models.Tag, error). Add AddTagToRepository(repoID int64, tagID int64) error and RemoveTagFromRepository(repoID int64, tagID int64) error for managing repository_tags junction table. Implement GetRepositoryTags(repoID int64) ([]*models.Tag, error) and GetTaggedRepositories(tagID int64) ([]*models.Repository, error). Use prepared statements and handle constraint violations properly.",
+            "status": "pending",
+            "testStrategy": "Test tag CRUD operations with validation. Verify 'gh:' prefix rejection. Test repository-tag associations are properly created and removed. Test cascade deletes work correctly. Test listing with filters."
+          },
+          {
+            "id": 4,
+            "title": "Add metadata store and search functionality with FTS5",
+            "description": "Implement metadata management for notes and full-text search capabilities using SQLite FTS5",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Create internal/repository/metadata_store.go with SetNote(repoID int64, note string) error, GetNote(repoID int64) (string, error), DeleteNote(repoID int64) error. Create internal/repository/search_store.go implementing Search(query string, opts SearchOptions) ([]*models.Repository, int, error) using FTS5 MATCH queries. Support phrase searches with quotes, boolean operators (AND, OR, NOT), and field-specific searches (name:, description:, note:). Update FTS5 index on note changes. Implement proper escaping for special FTS5 characters. Add SearchOptions struct with Limit, Offset, and IncludeArchived fields.",
+            "status": "pending",
+            "testStrategy": "Test note CRUD operations preserve multi-line text. Test FTS5 index updates after note changes. Test complex search queries with phrases and boolean operators. Test special character escaping. Verify search results ranking."
+          },
+          {
+            "id": 5,
+            "title": "Add transaction support and connection management",
+            "description": "Implement database transaction support, connection pooling, and query timeout handling for all store operations",
+            "dependencies": [
+              2,
+              3,
+              4
+            ],
+            "details": "Create internal/repository/store.go as base with Store struct containing *sql.DB. Add transaction methods: Begin() (*sql.Tx, error), Commit(tx *sql.Tx) error, Rollback(tx *sql.Tx) error. Modify all store methods to accept optional tx *sql.Tx parameter for transaction support. Implement connection pool configuration with SetMaxOpenConns, SetMaxIdleConns, SetConnMaxLifetime. Add context support to all queries with configurable timeout (default 5s). Create ExecuteInTransaction(fn func(tx *sql.Tx) error) helper for automatic transaction handling with rollback on error. Add pagination helper NewPaginatedResult(results, total, page, limit) for consistent pagination responses.",
+            "status": "pending",
+            "testStrategy": "Test transaction rollback on error. Test concurrent operations with connection pool. Test query timeouts trigger correctly. Test nested transactions are handled properly. Benchmark bulk operations with and without transactions."
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "GitHub API Client and Integration",
+        "description": "Implement GitHub API client for fetching stars and star lists with rate limiting",
+        "status": "pending",
+        "dependencies": [
+          1
+        ],
+        "priority": "high",
+        "details": "Create internal/github package with client.go using github.com/cli/go-gh/v2 for authentication as specified in docs/wip/gh-star-core/design.md (GitHub Integration & Sync Strategy section). Implement StarredRepository struct matching GitHub API response structure. Add methods: ListStarredRepositories with pagination (per_page=100), handling Link headers for cursor-based pagination. Implement ListStarLists and GetListRepositories for fetching GitHub Lists as detailed in docs/wip/gh-star-core/implementation.md Phase 3. Add exponential backoff for rate limiting using github.com/cenkalti/backoff/v4@v4.3.0. Parse X-RateLimit headers and implement smart waiting. Create progress reporter interface for long-running operations. Handle API errors with context (401 for auth, 403 for rate limit, 404 for not found). Transform GitHub API responses to internal models. Support both github.com and GitHub Enterprise URLs. Cache ETag headers for conditional requests to save API quota. Follow the API endpoints specified in .taskmaster/docs/gh-star-core-prd.txt Technical Architecture section: GET /user/starred (paginated), GET /users/{username}/lists, GET /users/{username}/lists/{list_id}/items. Implement the one-way sync strategy with namespaced tags as described in the design documentation.",
+        "testStrategy": "Mock GitHub API responses for unit tests. Test pagination handling with multiple pages. Test rate limit handling with backoff. Test error scenarios (auth failure, network errors). Integration test with real GitHub API using test account. Verify ETag caching reduces API calls. Test the specific endpoints mentioned in the design docs: starred repos, star lists, and list items.",
+        "subtasks": null
+      },
+      {
+        "id": 5,
+        "title": "Init and Sync Commands Implementation",
+        "description": "Implement 'gh star init' for initial setup and 'gh star sync' for incremental updates",
+        "status": "pending",
+        "dependencies": [
+          1,
+          2,
+          3,
+          4
+        ],
+        "priority": "high",
+        "details": "Create cmd/init.go implementing 'gh star init' command as detailed in docs/wip/gh-star-core/design.md (Core Features & Commands section) and docs/wip/gh-star-core/implementation.md (Phase 4, Task 4.1). Check if database exists, prompt for overwrite with --force flag. Create config directory and initialize database with migrations. Fetch all starred repositories using GitHub client with progress bar (github.com/schollz/progressbar/v3@v3.17.1). Fetch all Star Lists and create gh:* prefixed tags (normalize names: 'CLI Tools' -> 'gh:cli-tools') as specified in the design documentation. Insert repositories and tags in batches using transactions. Add --skip-lists flag to skip Star Lists import. Show summary: total repos, lists imported, time taken. Implement cmd/sync.go for incremental updates following the sync strategy detailed in docs/wip/gh-star-core/design.md (GitHub Integration & Sync Strategy section). Store last_sync timestamp in metadata table. Fetch stars since last sync using 'since' parameter. Update existing repos, add new ones. For gh:* tags: DELETE all where is_github_list=true, re-fetch lists, re-apply tags following the one-way sync with namespaced tags approach. Preserve all user tags. Add --full flag for complete re-sync. Show diff summary: added/updated/removed repos, lists changes. Implementation should follow Phase 4 specifications in docs/wip/gh-star-core/implementation.md and the complete init/sync workflows described in .taskmaster/docs/gh-star-core-prd.txt (Phase 1: Initialization and Sync).",
+        "testStrategy": "Test init creates database correctly. Test --force flag overwrites existing database. Test progress bar updates during fetch. Test Star Lists are imported with correct gh: prefix. Test sync only fetches new stars. Test gh:* tags are properly reconciled while user tags are preserved. Test error recovery during partial sync.",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create init command structure and database initialization logic",
+            "description": "Set up the cmd/init.go file with Cobra command structure and implement database initialization logic including directory creation and schema setup",
+            "dependencies": [],
+            "details": "Create cmd/init.go with Cobra command definition for 'gh star init'. Implement InitCmd function that checks for existing database using internal/config for paths. Add --force flag for overwriting existing database with confirmation prompt. Create config directory structure if it doesn't exist using os.MkdirAll. Initialize SQLite database connection and run migrations from internal/database package. Handle error cases for permission issues and disk space. Add initial metadata entry for tracking sync state.",
+            "status": "pending",
+            "testStrategy": "Test that init command creates database file at correct path. Verify --force flag prompts user and overwrites existing database. Test that migrations run successfully on fresh database. Verify metadata table has initial entries."
+          },
+          {
+            "id": 2,
+            "title": "Implement GitHub stars fetching with progress bar",
+            "description": "Add GitHub API integration to fetch all starred repositories with real-time progress indication using progressbar library",
+            "dependencies": [
+              1
+            ],
+            "details": "Add github.com/schollz/progressbar/v3@v3.17.1 dependency to go.mod. Create internal/github/stars.go with FetchAllStars function using go-gh client. Implement pagination for GitHub stars API (100 items per page). Initialize progress bar with total star count from user profile. Update progress bar after each page fetch. Handle rate limiting with exponential backoff. Collect all repositories in memory during fetch. Transform GitHub API responses to internal repository structs matching database schema.",
+            "status": "pending",
+            "testStrategy": "Mock GitHub API responses for testing pagination logic. Test progress bar updates correctly with different star counts. Verify rate limit handling with retry logic. Test transformation of API data to internal structs."
+          },
+          {
+            "id": 3,
+            "title": "Fetch and process GitHub Star Lists with tag normalization",
+            "description": "Implement fetching of GitHub Star Lists and convert them to normalized tags with gh: prefix for database storage",
+            "dependencies": [
+              1
+            ],
+            "details": "Create internal/github/lists.go with FetchStarLists function. Use GitHub GraphQL API to fetch all Star Lists for authenticated user. Implement name normalization function: convert to lowercase, replace spaces with hyphens, remove special characters ('CLI Tools' -> 'gh:cli-tools'). Create gh: prefixed tags for each list marking is_github_list=true. Build mapping of repository IDs to list names for bulk tag assignment. Add --skip-lists flag to init command to bypass Star Lists import. Handle empty lists and lists with duplicate normalized names.",
+            "status": "pending",
+            "testStrategy": "Test Star Lists API integration with mock responses. Verify name normalization handles edge cases (unicode, special chars). Test gh: prefix is always added to list tags. Verify --skip-lists flag skips the entire lists fetch process."
+          },
+          {
+            "id": 4,
+            "title": "Implement batch database insertion with transactions",
+            "description": "Create efficient batch insertion logic for repositories and tags using database transactions to handle thousands of records",
+            "dependencies": [
+              2,
+              3
+            ],
+            "details": "Create internal/database/batch.go with batch insertion functions. Implement BatchInsertRepositories using prepared statements and transactions (batch size 500). Create BatchInsertTags for both user tags and GitHub list tags. Implement BatchAssignTags for repository-tag associations. Use UPSERT logic (INSERT OR REPLACE) for repositories to handle duplicates. Ensure all operations within a transaction succeed or rollback entirely. Add progress indicators for batch operations. Optimize with PRAGMA synchronous=OFF during bulk insert, restore after completion.",
+            "status": "pending",
+            "testStrategy": "Test batch insertion with 3000+ repositories performs under 10 seconds. Verify transaction rollback on partial failures. Test UPSERT logic updates existing repositories correctly. Verify foreign key constraints are maintained."
+          },
+          {
+            "id": 5,
+            "title": "Create sync command with incremental update logic",
+            "description": "Implement cmd/sync.go for incremental updates that fetches only new stars and reconciles GitHub lists while preserving user tags",
+            "dependencies": [
+              4
+            ],
+            "details": "Create cmd/sync.go implementing 'gh star sync' command. Read last_sync timestamp from metadata table. Use GitHub API 'since' parameter to fetch only stars added after last sync. Implement diff logic to identify added/removed repositories. For GitHub lists (gh:* tags): DELETE all repository_tags where tag has is_github_list=true, re-fetch current Star Lists, re-apply normalized tags. Preserve all user-created tags during sync. Add --full flag to force complete re-sync ignoring last_sync. Update last_sync timestamp after successful sync. Display summary showing added/updated/removed counts and time taken.",
+            "status": "pending",
+            "testStrategy": "Test incremental sync only fetches new stars. Verify gh:* tags are completely replaced while user tags remain. Test --full flag performs complete re-sync. Verify last_sync timestamp updates correctly. Test sync handles deleted stars properly."
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "List, Search, and Show Commands",
+        "description": "Implement core query commands for listing, searching, and displaying repository details",
+        "status": "pending",
+        "dependencies": [
+          1,
+          3
+        ],
+        "priority": "high",
+        "details": "Implement cmd/list.go with filters: --tag (repeatable, AND logic), --language, --since, --until, --archived, --limit (default 50). Add --sort flag (starred|name|stars|updated, default starred desc). Support output formats: --format (text|json|tsv), default text showing 'owner/repo' per line. JSON uses encoding/json with indentation, TSV uses tabs. Implement cmd/search.go using FTS5 MATCH queries. Support FTS5 syntax: phrases \"exact match\", OR, NOT, wildcards. Combine with all list filters. Add --interactive flag for fzf integration (detect if installed). Sort by rank() for relevance. Implement cmd/show.go accepting owner/repo or GitHub URL. Display sections: Basic Info (name, description, URL, language, stars), Topics, Tags (separate gh:* and user tags), Notes, Timestamps. Add --json flag for structured output. Handle not found errors gracefully.\n\nDesign Documentation References:\n- Commands Specification: docs/wip/gh-star-core/design.md (Core Features & Commands section)\n- Implementation Plan: docs/wip/gh-star-core/implementation.md (Phase 5)\n- PRD: .taskmaster/docs/gh-star-core-prd.txt (Phase 2: Search and Discovery)\n\nThese documents detail all filter flags, output formats, and FTS5 search syntax specifications.",
+        "testStrategy": "Test list filters work individually and combined. Test sorting produces correct order. Test output formats are properly formatted. Test FTS5 search with complex queries. Test search result ranking. Test show command with various input formats. Test JSON output is valid and parseable. Test TSV output works with cut/awk. Reference design specifications in docs/wip/gh-star-core/design.md for complete test scenarios.",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement list command with basic filtering",
+            "description": "Create cmd/list.go with core listing functionality and basic filters for tags, language, and date ranges as specified in design.md Core Features & Commands section",
+            "dependencies": [],
+            "details": "Implement cmd/list.go using Cobra. Add flags: --tag (repeatable, StringSliceVar), --language (string), --since/--until (string, parsed as dates), --archived (bool), --limit (int, default 50). Create internal/commands/list.go with ListOptions struct matching repository.ListOptions. Use repository_store.List() method from task 3 to fetch filtered results. Implement AND logic for multiple --tag flags by checking all tags exist for each repo. Parse date strings to time.Time for since/until filters. Follow specifications in docs/wip/gh-star-core/design.md Core Features & Commands section for exact flag behavior.",
+            "status": "pending",
+            "testStrategy": "Test each filter individually works correctly. Test combining multiple filters with AND logic. Test date parsing handles various formats. Test limit defaults to 50 and can be overridden. Verify archived flag filters correctly. Reference design.md for complete filter specifications."
+          },
+          {
+            "id": 2,
+            "title": "Add sorting and output formatting to list command",
+            "description": "Extend list command with sorting options and support for text, JSON, and TSV output formats as detailed in implementation.md Phase 5",
+            "dependencies": [
+              1
+            ],
+            "details": "Add --sort flag with choices: starred (default, DESC by starred_at), name (ASC alphabetical), stars (DESC by star count), updated (DESC by updated_at). Implement --format flag (text|json|tsv, default text). For text format, output one 'owner/repo' per line. For JSON, use encoding/json with MarshalIndent for pretty printing. For TSV, use fmt.Sprintf with tabs between fields (owner/repo, description, language, stars). Create formatters package with TextFormatter, JSONFormatter, TSVFormatter interfaces implementing Format(repos []Repository) string. Follow output format specifications in docs/wip/gh-star-core/design.md.",
+            "status": "pending",
+            "testStrategy": "Test each sort option produces correct ordering. Test text format outputs correct owner/repo format. Test JSON output is valid and properly indented. Test TSV uses tabs and handles fields with special characters. Test default sort is starred DESC. Validate against design.md specifications."
+          },
+          {
+            "id": 3,
+            "title": "Implement search command with FTS5 integration",
+            "description": "Create search command using SQLite FTS5 full-text search with support for complex queries as specified in PRD Phase 2: Search and Discovery",
+            "dependencies": [],
+            "details": "Create cmd/search.go using Cobra. Accept search query as positional argument. Support FTS5 MATCH syntax: \"exact phrases\" in quotes, OR operator, NOT operator, wildcards with *. Reuse all list command filters (--tag, --language, --since, --until, --archived, --limit). Call repository_store.Search() method which uses FTS5 MATCH queries on repositories_fts table. Sort results by rank() DESC for relevance. Implement --interactive flag that pipes results to fzf if installed (check with exec.LookPath). Format output same as list command with --format support. Follow FTS5 specifications in docs/wip/gh-star-core/design.md and implementation.md Phase 5.",
+            "status": "pending",
+            "testStrategy": "Test FTS5 queries with phrases, OR, NOT, wildcards. Test search combined with other filters. Test ranking orders by relevance. Test interactive mode detects fzf availability. Test complex queries like 'cli OR \"command line\" NOT deprecated'. Verify search handles special characters in queries. Reference design documentation for complete FTS5 syntax support."
+          },
+          {
+            "id": 4,
+            "title": "Implement show command for repository details",
+            "description": "Create show command to display detailed information about a specific repository following the format specification in design.md",
+            "dependencies": [],
+            "details": "Create cmd/show.go accepting repository identifier as argument. Parse input as either 'owner/repo' format or full GitHub URL (https://github.com/owner/repo). Use repository_store.FindByFullName() to fetch repository. Display sections: Basic Info (name, description, homepage, URL, language, star count), Topics (if any), Tags (separate gh:* prefixed and user tags), Notes (if exists), Timestamps (starred_at, updated_at). Implement --json flag for structured JSON output using encoding/json. Handle not found errors with helpful message suggesting 'gh star sync' if repo might be newly starred. Follow exact output format specification in docs/wip/gh-star-core/design.md Core Features & Commands section.",
+            "status": "pending",
+            "testStrategy": "Test parsing both owner/repo and URL formats. Test all sections display correctly when data exists. Test empty sections are handled gracefully. Test JSON output includes all fields. Test error message for non-existent repos. Verify gh: tags are separated from user tags in display. Validate output matches design.md specification."
+          },
+          {
+            "id": 5,
+            "title": "Integration testing and command documentation",
+            "description": "Create comprehensive integration tests and help documentation for all three commands referencing design specifications",
+            "dependencies": [
+              1,
+              2,
+              3,
+              4
+            ],
+            "details": "Create cmd/list_test.go, cmd/search_test.go, cmd/show_test.go with integration tests using testdata database. Test command combinations and edge cases. Add detailed help text to each command using Cobra's Long descriptions. Include examples in help text showing common use cases from docs/wip/gh-star-core/design.md. Create internal/testutil package with helper functions for setting up test databases with known data. Test error scenarios like invalid dates, malformed queries, non-existent repos. Verify all commands handle empty results gracefully. Document FTS5 search syntax in search command help referencing design specifications. Ensure help text matches command specifications in design.md and implementation.md.",
+            "status": "pending",
+            "testStrategy": "Run integration tests against test database with known data. Test help text displays correctly for each command. Verify examples in help text actually work and match design.md specifications. Test edge cases like empty database, single result, maximum results. Test command aliases if any are defined. Validate all behavior against design documentation."
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Tag and Note Management Commands",
+        "description": "Implement commands for managing user tags and notes on repositories",
+        "status": "pending",
+        "dependencies": [
+          1,
+          3
+        ],
+        "priority": "medium",
+        "details": "Following design specifications in docs/wip/gh-star-core/design.md (Core Features & Commands section) and implementation plan in docs/wip/gh-star-core/implementation.md (Phase 6), create cmd/tag.go with subcommands using Cobra. Implement 'tag add <repo> <tags...>' - validate tags don't start with 'gh:', add multiple tags in transaction. Implement 'tag remove <repo> <tags...>' - remove specified tags. Add 'tags' subcommand listing all tags with counts, support --user-only, --github-only filters, --sort by name or count. Create cmd/note.go with 'note set <repo> <text>' accepting text as args or stdin with '-'. Support multi-line notes, update FTS5 index after changes. Implement 'note show <repo>' displaying notes to stdout. Add 'note remove <repo>' to clear notes. All commands accept owner/repo format or GitHub URL. Show confirmation messages after modifications. Handle repository not found errors with suggestions. Reference design documentation: Tag/Note Commands: docs/wip/gh-star-core/design.md (Core Features & Commands section), Implementation Plan: docs/wip/gh-star-core/implementation.md (Phase 6), PRD: .taskmaster/docs/gh-star-core-prd.txt (Phase 3: Organization). These documents specify tag validation rules and note management features.",
+        "testStrategy": "Test tag validation rejects gh: prefix. Test bulk tag operations are atomic. Test tags command filtering and sorting. Test note set from args and stdin. Test multi-line notes are preserved. Test FTS5 index updates after note changes. Test error handling for non-existent repos.",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement tag add command",
+            "description": "Create cmd/tag.go with tag add subcommand supporting multiple tags per repository",
+            "dependencies": [],
+            "details": "Following implementation.md Phase 6 Task 6.1, implement `gh star tag add <repo> <tags...>` command. Parse repository and tag names from arguments, validate tags (reject gh: prefix for user tags), get or create tags in database, add tag associations to repository. Handle repository not found errors gracefully. Make operation idempotent (adding existing tag is no-op). Support multiple tags in single command execution. Use database transactions for atomicity.",
+            "status": "pending",
+            "testStrategy": "Test adding single tag, multiple tags, idempotency, validation rejecting gh: prefix, error handling for non-existent repositories"
+          },
+          {
+            "id": 2,
+            "title": "Implement tag remove command",
+            "description": "Add tag remove subcommand to support removing tags from repositories",
+            "dependencies": [
+              1
+            ],
+            "details": "Following implementation.md Phase 6 Task 6.2, implement `gh star tag remove <repo> <tags...>` command. Parse repository and tag names, remove tag associations from repository_tags table. Don't delete tag definition (keep for other repos), handle non-existent tags gracefully (silently ignore), support multiple tags in single command.",
+            "status": "pending",
+            "testStrategy": "Test removing existing tags, removing non-existent tags, removing multiple tags, ensuring tag definitions remain for other repositories"
+          },
+          {
+            "id": 3,
+            "title": "Implement tags list command",
+            "description": "Add tags listing subcommand showing all tags with repository counts",
+            "dependencies": [
+              1
+            ],
+            "details": "Following implementation.md Phase 6 Task 6.3, implement `gh star tags` or `gh star tag list` command. Query all tags with repository counts, support sorting by name or count, filter by tag type (--user-only, --github-only). Output format shows tag name with count in parentheses. Support --sort flag with count|name options.",
+            "status": "pending",
+            "testStrategy": "Test listing all tags with counts, filtering by user-only and github-only, sorting by name and count"
+          },
+          {
+            "id": 4,
+            "title": "Implement note set command",
+            "description": "Create cmd/note.go with note set functionality supporting text input and stdin",
+            "dependencies": [],
+            "details": "Following implementation.md Phase 6 Task 6.4, create cmd/note.go and implement `gh star note set <repo> <text>` command. Support reading from stdin when text is '-', handle multi-line notes, update repository_metadata table with notes and last_modified timestamp. Overwrite existing notes (not append), handle empty notes to clear existing notes. Update FTS5 index after note changes.",
+            "status": "pending",
+            "testStrategy": "Test setting notes from args, reading from stdin, overwriting notes, multi-line notes, FTS5 index updates"
+          },
+          {
+            "id": 5,
+            "title": "Implement note show command",
+            "description": "Add note show subcommand to display repository notes",
+            "dependencies": [
+              4
+            ],
+            "details": "Following implementation.md Phase 6 Task 6.5, implement `gh star note show <repo>` command. Parse repository identifier, fetch notes from repository_metadata table, display notes text or message if no notes exist. Handle repository not found errors with helpful suggestions.",
+            "status": "pending",
+            "testStrategy": "Test showing existing notes, showing repo with no notes, error handling for non-existent repositories"
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Bulk Operations Implementation",
+        "description": "Implement bulk-tag and bulk-unstar commands for batch operations",
+        "status": "pending",
+        "dependencies": [
+          1,
+          3,
+          4,
+          6
+        ],
+        "priority": "medium",
+        "details": "Implement cmd/bulk-tag.go and cmd/bulk-unstar.go following the detailed design specification in docs/wip/gh-star-core/design.md (Core Features & Commands section), implementation plan in docs/wip/gh-star-core/implementation.md (Phase 7), and PRD requirements in .taskmaster/docs/gh-star-core-prd.txt (Phase 4: Batch Operations). For bulk-tag: Accept all list filters to select repositories, add --tags flag for comma-separated tags to add, show preview of affected repositories count, prompt for confirmation unless --yes flag, execute in single transaction for atomicity, show progress bar and summary. For bulk-unstar: Use same filtering system, show list of repos to be unstarred with confirmation prompt, call GitHub API to unstar (DELETE /user/starred/{owner}/{repo}), remove from local database only after successful API call, handle API failures gracefully - continue processing and track failures. Use goroutines with semaphore (max 5 concurrent) for API calls, show final summary: X succeeded, Y failed with error details. Add --dry-run flag to preview without executing. Reference the design documents for specific transaction handling patterns and error recovery strategies.",
+        "testStrategy": "Test bulk-tag filter combinations select correct repos. Test transaction rollback on error. Test confirmation prompt and --yes flag. Test bulk-unstar API calls with mocked responses. Test error handling continues processing. Test concurrent API calls respect rate limits. Test dry-run mode doesn't modify data. Follow testing patterns outlined in the design documentation for batch operations.",
+        "subtasks": null
+      },
+      {
+        "id": 9,
+        "title": "Export and Import Functionality",
+        "description": "Implement export to YAML/JSON and import from exported collections following the comprehensive design specification in docs/wip/gh-star-core/design.md (Export/Import File Format section), implementation plan in docs/wip/gh-star-core/implementation.md (Phase 8), and PRD requirements in .taskmaster/docs/gh-star-core-prd.txt (Phase 5: Export and Import).",
+        "status": "pending",
+        "dependencies": [
+          1,
+          3
+        ],
+        "priority": "medium",
+        "details": "Implement cmd/export.go accepting path argument following the detailed directory structure specification in design.md (Export/Import File Format section). Create directory structure: <path>/stars/owner/repo.yaml with metadata.yaml containing export_version, exported_at, repository_count, tag_count, and format fields as specified. Support --format (yaml|json), default yaml using gopkg.in/yaml.v3. Each repository file contains complete GitHub metadata (github_id, full_name, owner, name, description, url, homepage, language, stars_count, forks_count, topics, archived, starred_at, created_at, updated_at) and user metadata (tags separated into gh:* and user tags, notes, custom_fields) as per the YAML/JSON format specification in design.md. Accept all list filters to export subset. Show progress bar with github.com/schollz/progressbar/v3. Implement cmd/import.go accepting path to exported directory following Phase 8 implementation plan. Auto-detect format by file extension (.yaml/.json). Default mode: show repos to be replaced, prompt confirmation, clear database, import all. --merge mode: update existing repositories by GitHub ID, add new repos, merge tags by name. Validate file structure against expected metadata.yaml format before import. Show progress and summary. Handle malformed files gracefully with detailed error reporting per the design specifications.",
+        "testStrategy": "Test export creates correct directory structure per design.md specification. Verify metadata.yaml format matches export_version schema. Test YAML and JSON formats validate against the repository file format specification in design.md. Test filtered exports include only matching repos. Test import detects format correctly from file extensions. Test replace mode confirmation flow and database clearing. Test merge mode preserves existing data and merges tags correctly. Test import validates metadata.yaml structure before processing. Test import handles corrupted files gracefully with actionable error messages. Test round-trip export->import preserves all GitHub metadata and user metadata (tags, notes, custom_fields) exactly as specified in the design document formats.",
+        "subtasks": null
+      },
+      {
+        "id": 10,
+        "title": "Interactive Mode with fzf Integration",
+        "description": "Add interactive selection mode using fzf for search and list commands",
+        "status": "pending",
+        "dependencies": [
+          6
+        ],
+        "priority": "low",
+        "details": "Create internal/interactive package based on design specifications in docs/wip/gh-star-core/design.md (Interactive Mode & Pipeline Integration section) and implementation plan in docs/wip/gh-star-core/implementation.md (Phase 9). Implement fzf detection using exec.LookPath('fzf'). If not found, show helpful error with installation instructions. Implement RunFzf function accepting repository list and options. Build fzf command with: --multi for multi-select with TAB, --preview 'gh star show {}' for preview pane, --preview-window right:50%:wrap, --header with instructions. For list/search --interactive: pipe filtered repos to fzf stdin as 'owner/repo' per line. Parse fzf output (selected items) and write to stdout. Support --bind actions for common operations (ctrl-t to tag, ctrl-n for notes). Handle fzf exit codes: 0 (selection made), 1 (no selection), 2 (error), 130 (interrupted). Add configuration for fzf options via environment variable GH_STAR_FZF_OPTS. Fallback to simple selection menu using survey library if fzf unavailable but --interactive used. Refer to .taskmaster/docs/gh-star-core-prd.txt (Phase 6) for requirements and the design document for the complete interactive mode specification including preview command format and key bindings.",
+        "testStrategy": "Test fzf detection works correctly. Test command construction with various options. Test multi-select output parsing. Test preview command integration. Test error handling for fzf failures. Test fallback behavior when fzf not installed. Mock fzf for unit tests. Test environment variable GH_STAR_FZF_OPTS customization. Test all supported fzf exit codes. Test key bindings and actions work as specified in the design documentation.",
+        "subtasks": null
+      },
+      {
+        "id": "11",
+        "title": "Testing, Documentation, and Release Preparation",
+        "description": "Comprehensive testing, documentation, and build setup for distribution",
+        "status": "pending",
+        "dependencies": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10
+        ],
+        "priority": "high",
+        "details": "Set up testing framework with testify/assert and testify/mock following the testing strategies outlined in docs/wip/gh-star-core/design.md (Testing Strategy section) and docs/wip/gh-star-core/implementation.md (Phases 10-11). Create test fixtures with 3000+ sample repositories in testdata/ as specified in implementation.md Task 10.4. Write unit tests achieving 80%+ coverage using 'go test -cover' for all internal packages (config, db, github, export, interactive, output). Add integration tests in tests/ directory using real database and mock GitHub API responses. Create GitHub Actions workflow (.github/workflows/ci.yml) running tests on Linux, macOS, Windows with Go 1.21+ as detailed in implementation.md Task 11.2. Add golangci-lint for code quality checks as specified in Task 10.4. Write comprehensive README.md following the structure outlined in implementation.md Task 10.3 with installation instructions via 'gh extension install', usage examples for all commands, configuration options, and workflow examples. Create man page using cobra/doc generation. Add shell completion scripts for bash, zsh, fish. Set up goreleaser (.goreleaser.yaml) for cross-platform builds as specified in implementation.md Task 11.1. Configure builds for linux/amd64, linux/arm64, darwin/amd64, darwin/arm64, windows/amd64 targeting the pure-Go SQLite driver (modernc.org/sqlite). Create GitHub Actions release workflow (.github/workflows/release.yml) triggered by tags as detailed in implementation.md Task 11.2. Add version info with git tag embedding using -ldflags. Create CHANGELOG.md following Keep a Changelog format. Add LICENSE file (MIT or Apache 2.0). Reference success criteria from .taskmaster/docs/gh-star-core-prd.txt including performance with 3000+ repos, cross-platform support, and comprehensive test coverage targets.",
+        "testStrategy": "Run full test suite on all platforms via CI as specified in docs/wip/gh-star-core/implementation.md Phase 11. Test installation via 'gh extension install'. Test all commands with various flag combinations as outlined in the command reference sections of design.md. Benchmark performance with 3000+ repos database following the performance testing strategy in implementation.md Task 10.4. Test shell completions work correctly. Verify builds on all target platforms (Linux amd64/arm64, macOS amd64/arm64, Windows amd64). Test upgrade path from previous versions. Execute the quality assurance checklist from implementation.md including go vet, golangci-lint, test coverage verification, memory profiling for large datasets, and cross-compilation verification. Validate that all success criteria from the PRD are met including sub-second query times, pipeline-friendly output, reliable sync behavior, and zero-config setup for gh CLI users.",
+        "subtasks": null
+      }
+    ],
+    "metadata": {
+      "created": "2025-11-16T08:56:41.376Z",
+      "updated": "2025-11-16T08:56:41.376Z",
+      "description": "Tasks for master context"
+    }
+  }
+}
