@@ -25,7 +25,7 @@
     "defaultNumTasks": 10,
     "defaultSubtasks": 5,
     "defaultPriority": "medium",
-    "projectName": "claude-starter-kit",
+    "projectName": "gh-star",
     "ollamaBaseURL": "",
     "bedrockBaseURL": "",
     "responseLanguage": "English",

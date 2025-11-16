@@ -40,7 +40,7 @@ Once you believe you understand what we're trying to achieve, stop and **describ
 Document in .md files the entire design and write a comprehensive implementation plan in `/docs/wip/[feature-title]/{design,implementation}.md`. Feel free to break out the design/implementation documents into multi-part files, if necessary.
 
 **When documenting design and implementation plan**:
-- Assume the developer who is going to implement the feature is an experienced and highly-skilled %LANGUAGE% developer, but has zero context for our codebase, and knows almost nothing about our problem domain. Basically - a first-time contributor with a lot of programming experience in %LANGUAGE%.
+- Assume the developer who is going to implement the feature is an experienced and highly-skilled go developer, but has zero context for our codebase, and knows almost nothing about our problem domain. Basically - a first-time contributor with a lot of programming experience in go.
 - **Document everything the developer may need to know**: which files to touch for each task, code structure to be aware of, testing approaches, any potential docs they might need to check. Give them the whole plan as bite-sized tasks.
 - **Make sure the plan is unambiguous, detailed and comprehensive** so the developer can adhere to DRY, YAGNI, TDD, atomic/self-contained commits principles when following this plan.
 

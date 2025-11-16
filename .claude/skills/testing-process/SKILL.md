@@ -17,7 +17,7 @@ Use the following guidelines when working with tests:
 - Use table-/data-driven tests and test generation
 - Benchmark tests and performance regression detection
 - Integration testing with test containers
-- Mock generation with %LANGUAGE% best practices and well-establised %LANGUAGE% mocking tools
-- Property-based testing with %LANGUAGE% best practices and well-establised %LANGUAGE% testing tools
+- Mock generation with go best practices and well-establised go mocking tools
+- Property-based testing with go best practices and well-establised go testing tools
 - Propose end-to-end testing strategies if automated e2e testing is not feasible
 - Code coverage analysis and reporting
